@@ -666,17 +666,19 @@ select {
   display: inline-block;
   background-repeat: no-repeat;
   background-color: #efe4cc;
+  border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.26);
 }
 
 .pawn-piece {
-  width: 18px;
-  height: 18px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background-size: 300% 200%;
+  background-size: cover;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
   transition: transform 200ms ease;
+  z-index: 10;
 }
 
 .pawn-piece:hover {
@@ -1272,3 +1274,4 @@ dialog::backdrop {
     grid-template-columns: 1fr;
   }
 }
+

@@ -1435,7 +1435,7 @@ function sanitizeNotebookDocument(documentHtml) {
 }
 
 function chessPieceStyle(suspect) {
-  return `${backgroundGridStyle("/assets/chess.jpg", suspect.chessCell, 3, 2)} border-radius:50%;`;
+  return `background-image: none; background-color: ${suspect.color}; border: 2px solid rgba(255, 255, 255, 0.6);`;
 }
 
 function pawnMarkup(suspect, title) {
