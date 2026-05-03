@@ -1,16 +1,17 @@
 :root {
-  --ink: #f9edd6;
-  --ink-soft: rgba(249, 237, 214, 0.72);
-  --gold: #d8b269;
-  --deep: #120d0a;
-  --panel: rgba(31, 20, 14, 0.88);
-  --panel-2: rgba(45, 28, 20, 0.9);
-  --line: rgba(255, 230, 183, 0.12);
-  --line-strong: rgba(255, 230, 183, 0.24);
-  --shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
-  --radius-xl: 28px;
-  --radius-lg: 22px;
-  --radius-md: 16px;
+  --ink: #e0d9cc;
+  --ink-soft: rgba(224, 217, 204, 0.6);
+  --gold: #c68c53;
+  --blood: #8f1b1b;
+  --deep: #050505;
+  --panel: rgba(20, 20, 20, 0.95);
+  --panel-2: rgba(30, 30, 30, 0.98);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --shadow: 0 32px 80px rgba(0, 0, 0, 0.8);
+  --radius-xl: 24px;
+  --radius-lg: 18px;
+  --radius-md: 12px;
 }
 
 * {
@@ -28,9 +29,9 @@ body {
   font-family: 'Inter', Georgia, 'Times New Roman', serif;
   color: var(--ink);
   background:
-    radial-gradient(circle at top left, rgba(196, 74, 52, 0.2), transparent 24%),
-    radial-gradient(circle at right 20%, rgba(66, 116, 101, 0.18), transparent 22%),
-    linear-gradient(180deg, #1a120d 0%, #21150f 45%, #120c08 100%);
+    radial-gradient(circle at 50% 40%, rgba(30, 30, 30, 0.1) 0%, rgba(5, 5, 5, 0.9) 100%),
+    linear-gradient(135deg, rgba(20, 20, 20, 1) 0%, rgba(10, 10, 10, 1) 100%);
+  background-attachment: fixed;
 }
 
 h1, h2, h3 {
@@ -199,18 +200,15 @@ select {
 }
 
 .stage-card,
-.board-panel,
 .side-card {
-  background:
-    linear-gradient(180deg, rgba(244, 232, 207, 0.06), rgba(255, 255, 255, 0.01)),
-    var(--panel);
-  border: 1px solid var(--line);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow);
-}
-
-.stage-card,
-.board-panel,
+  border: 1px solid var(--line);
+  background: 
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+    var(--panel);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  padding: 32px 36px;
+}.board-panel,
 .side-card {
   padding: 22px;
 }
@@ -251,8 +249,8 @@ select {
 .control input:focus,
 .control select:focus {
   outline: none;
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px rgba(216, 178, 105, 0.2), 0 0 16px rgba(216, 178, 105, 0.1);
+  border-color: var(--blood);
+  box-shadow: 0 0 0 3px rgba(143, 27, 27, 0.2), 0 0 16px rgba(143, 27, 27, 0.2);
 }
 
 .player-form-list {
@@ -374,11 +372,11 @@ select {
 
 .turn-banner {
   background:
-    linear-gradient(180deg, rgba(244, 232, 207, 0.06), rgba(255, 255, 255, 0.01)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
     var(--panel);
   border-radius: 24px;
   border: 1px solid var(--line);
-  box-shadow: var(--shadow);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
   padding: 22px 24px;
 }
 
@@ -523,8 +521,12 @@ select {
   padding: 14px;
   min-width: 500px;
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(130, 88, 41, 0.56), rgba(77, 47, 19, 0.78));
-  box-shadow: inset 0 0 0 1px rgba(255, 220, 163, 0.22), 0 16px 36px rgba(0, 0, 0, 0.32);
+  background: #1c2331; /* Dark blueprint base */
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08), 0 24px 48px rgba(0, 0, 0, 0.8);
 }
 
 .board-grid {
@@ -549,34 +551,35 @@ select {
 .tile {
   display: grid;
   place-items: center;
-  background: #dfd3bf;
+  background: rgba(255, 255, 255, 0.03); /* Translucent blueprint cells */
 }
 
 .tile--hallway {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.06)), #d8c6ae;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .tile--start {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.06)), #d8c6ae;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .tile--door {
-  background: linear-gradient(180deg, rgba(255, 232, 172, 0.4), rgba(86, 43, 14, 0.08)), #dfcfb8;
+  background: rgba(143, 27, 27, 0.15); /* Subtle red tint for doors */
+  border: 1px dashed rgba(143, 27, 27, 0.4);
 }
 
 .tile--reachable {
   box-shadow:
-    inset 0 0 0 4px rgba(255, 247, 235, 0.96),
-    0 0 0 4px rgba(232, 58, 40, 0.98),
-    0 0 24px rgba(232, 58, 40, 0.72);
+    inset 0 0 0 4px rgba(255, 200, 200, 0.96),
+    0 0 0 4px rgba(200, 20, 20, 0.98),
+    0 0 24px rgba(200, 20, 20, 0.8);
   cursor: pointer;
   z-index: 4;
   animation: reachable-pulse 1.6s ease-in-out infinite;
 }
 
 @keyframes reachable-pulse {
-  0%, 100% { box-shadow: inset 0 0 0 4px rgba(255, 247, 235, 0.96), 0 0 0 4px rgba(232, 58, 40, 0.98), 0 0 24px rgba(232, 58, 40, 0.72); }
-  50% { box-shadow: inset 0 0 0 4px rgba(255, 247, 235, 0.96), 0 0 0 4px rgba(232, 58, 40, 0.98), 0 0 40px rgba(232, 58, 40, 0.9); }
+  0%, 100% { box-shadow: inset 0 0 0 4px rgba(255, 200, 200, 0.96), 0 0 0 4px rgba(200, 20, 20, 0.98), 0 0 24px rgba(200, 20, 20, 0.8); }
+  50% { box-shadow: inset 0 0 0 4px rgba(255, 200, 200, 0.96), 0 0 0 4px rgba(200, 20, 20, 0.98), 0 0 40px rgba(200, 20, 20, 1); }
 }
 
 .tile-label {

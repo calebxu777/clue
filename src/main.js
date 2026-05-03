@@ -736,7 +736,7 @@ function canSuggest(currentRoom) {
 }
 
 function canTunnel(currentRoom) {
-  return canAct() && Boolean(currentRoom?.tunnelTo);
+  return canAct() && Boolean(currentRoom?.tunnelTo) && state.server.match.rollValue === null && !state.server.match.hasMovedThisTurn;
 }
 
 function canEndTurn() {
@@ -824,9 +824,6 @@ function tileBoardStyle(tile) {
   if (tile.type === "door") {
     return doorTileStyle();
   }
-  if (tile.type === "start") {
-    return "background: linear-gradient(180deg, rgba(255, 255, 255, 0.35), rgba(0, 0, 0, 0.06)), #d8c6ae;";
-  }
   return "";
 }
 
@@ -878,11 +875,12 @@ function buildNotebookFrameDocument(match, self) {
     <style>
       :root {
         color-scheme: light;
-        --paper: #f8f3e8;
-        --paper-edge: #e6d9c0;
-        --line: #b9aa8c;
-        --ink: #2b2015;
-        --muted: #6a5a45;
+        --paper: #f4e8b3;
+        --paper-edge: #d8c47b;
+        --line: #9ec2e6;
+        --line-strong: #d46a6a;
+        --ink: #1a1f2b;
+        --muted: #5e6b7e;
         --accent: #8a2f20;
         --accent-soft: rgba(138, 47, 32, 0.1);
       }
@@ -891,11 +889,11 @@ function buildNotebookFrameDocument(match, self) {
 
       body {
         margin: 0;
-        font-family: Georgia, "Times New Roman", serif;
+        font-family: 'Special Elite', monospace;
         color: var(--ink);
-        background:
-          radial-gradient(circle at top left, rgba(188, 75, 54, 0.08), transparent 22%),
-          linear-gradient(180deg, #efe5d4, #f8f3e8);
+        background: var(--paper);
+        background-image: repeating-linear-gradient(transparent, transparent 31px, var(--line) 31px, var(--line) 32px);
+        background-attachment: local;
       }
 
       .frame {
@@ -903,12 +901,18 @@ function buildNotebookFrameDocument(match, self) {
         padding: 14px;
       }
 
-      .toolbar,
+      .toolbar {
+        border: 1px dashed var(--paper-edge);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.3);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        font-family: 'Inter', sans-serif;
+      }
+
       .sheet-wrap {
-        border: 1px solid var(--paper-edge);
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.72);
-        box-shadow: 0 8px 22px rgba(77, 51, 28, 0.12);
+        border-left: 2px solid var(--line-strong);
+        padding-left: 14px;
+        background: transparent;
       }
 
       .toolbar {
@@ -1015,32 +1019,31 @@ function buildNotebookFrameDocument(match, self) {
       }
 
       .cell-mark {
-        position: relative;
-        z-index: 1;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-width: 24px;
-        min-height: 24px;
-        padding: 2px 4px;
-        border-radius: 10px;
         font-weight: 700;
+        pointer-events: none;
+        vertical-align: middle;
+        margin: 0 1px;
       }
 
       .cell-mark--check {
-        color: #1e6a42;
-        background: rgba(30, 106, 66, 0.1);
+        color: rgba(30, 106, 66, 0.85);
+        font-size: 1.1rem;
       }
 
       .cell-mark--cross {
-        color: #8a2f20;
-        background: rgba(138, 47, 32, 0.1);
+        color: rgba(138, 47, 32, 0.85);
+        font-size: 1.1rem;
       }
 
       .cell-mark--text {
-        font-size: 0.82rem;
-        color: var(--ink);
-        background: rgba(43, 32, 21, 0.08);
+        font-size: 0.8rem;
+        color: #050a14;
+        background: rgba(255, 255, 255, 0.55);
+        border-radius: 3px;
+        padding: 0 3px;
       }
 
       .cell-inline-input {
@@ -1072,6 +1075,7 @@ function buildNotebookFrameDocument(match, self) {
         width: 100%;
         height: 100%;
         pointer-events: none;
+        z-index: 10;
       }
 
       canvas.is-drawing {
@@ -1094,13 +1098,16 @@ function buildNotebookFrameDocument(match, self) {
           <button type="button" data-tool="type">Type</button>
           <button type="button" data-tool="check">Check</button>
           <button type="button" data-tool="cross">Cross</button>
+          <button type="button" data-tool="clear-marks">Clear ✓/✕</button>
           <button type="button" data-tool="clear">Clear Cell</button>
         </div>
         <div class="tool-group">
           <button type="button" data-action="clear-ink">Clear Ink</button>
-          <button type="button" data-action="undo" id="undo-btn">Undo</button>
         </div>
         <span class="toolbar-note">Private sheet for ${escapeHtml(self?.name ?? "Detective")}${match.lastReveal?.card ? ` \u2022 ${escapeHtml(match.lastReveal.disproverName ?? "Someone")} showed: ${escapeHtml(match.lastReveal.card.name)}` : ""}</span>
+      </div>
+      <div style="font-size: 0.82rem; margin-bottom: 8px; color: var(--muted); text-align: center;">
+        Select a tool to mark the grid. Marks can be stacked. Click again to toggle off. Use 'Clear Cell' to remove all marks from a cell. Use 'Rubber' to erase pen strokes.
       </div>
       <div class="sheet-wrap">
         <div class="sheet-stage" id="sheet-stage">
@@ -1121,39 +1128,7 @@ function buildNotebookFrameDocument(match, self) {
         cells: payload.notebookState?.cells || {},
         strokes: payload.notebookState?.strokes || [],
       };
-      const undoHistory = [];
-      const MAX_UNDO = 50;
       let activeStroke = null;
-
-      function pushUndo() {
-        undoHistory.push({
-          cells: JSON.parse(JSON.stringify(state.cells)),
-          strokes: JSON.parse(JSON.stringify(state.strokes)),
-        });
-        if (undoHistory.length > MAX_UNDO) {
-          undoHistory.shift();
-        }
-        updateUndoButton();
-      }
-
-      function performUndo() {
-        if (undoHistory.length === 0) return;
-        const snapshot = undoHistory.pop();
-        state.cells = snapshot.cells;
-        state.strokes = snapshot.strokes;
-        renderTable();
-        redrawStrokes();
-        postUpdate();
-        updateUndoButton();
-      }
-
-      function updateUndoButton() {
-        const btn = document.getElementById('undo-btn');
-        if (btn) {
-          btn.disabled = undoHistory.length === 0;
-          btn.textContent = undoHistory.length > 0 ? 'Undo (' + undoHistory.length + ')' : 'Undo';
-        }
-      }
 
       function escapeText(value) {
         return String(value ?? "")
@@ -1190,16 +1165,11 @@ function buildNotebookFrameDocument(match, self) {
 
       function renderCell(entry) {
         if (!entry) return "";
-        if (entry.kind === "text") {
-          return \`<span class="cell-mark cell-mark--text">\${escapeText(entry.value)}</span>\`;
-        }
-        if (entry.kind === "check") {
-          return '<span class="cell-mark cell-mark--check">✓</span>';
-        }
-        if (entry.kind === "cross") {
-          return '<span class="cell-mark cell-mark--cross">✕</span>';
-        }
-        return "";
+        let html = "";
+        if (entry.text) html += \`<span class="cell-mark cell-mark--text">\${escapeText(entry.text)}</span>\`;
+        if (entry.check) html += '<span class="cell-mark cell-mark--check">&#10003;</span>';
+        if (entry.cross) html += '<span class="cell-mark cell-mark--cross">&#10005;</span>';
+        return html;
       }
 
       function cellKey(sectionId, itemId, playerId) {
@@ -1280,11 +1250,12 @@ function buildNotebookFrameDocument(match, self) {
 
       let activeInlineInput = null;
 
-      function beginInlineEdit(cell, key) {
+      function beginInlineEdit(key) {
         if (activeInlineInput) {
           commitInlineEdit();
         }
-        const existing = state.cells[key]?.kind === "text" ? state.cells[key].value : "";
+        const cell = document.querySelector(\`td[data-cell-key="\${key}"]\`);
+        const existing = state.cells[key]?.text || "";
         cell.classList.add("cell-editing");
         cell.innerHTML = "";
         const input = document.createElement("input");
@@ -1294,7 +1265,7 @@ function buildNotebookFrameDocument(match, self) {
         input.maxLength = 10;
         input.placeholder = "...";
         cell.appendChild(input);
-        activeInlineInput = { input, cell, key };
+        activeInlineInput = { input, key };
 
         input.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {
@@ -1321,25 +1292,35 @@ function buildNotebookFrameDocument(match, self) {
 
       function commitInlineEdit() {
         if (!activeInlineInput) return;
-        const { input, cell, key } = activeInlineInput;
+        const { input, key } = activeInlineInput;
         activeInlineInput = null;
         const cleaned = input.value.trim().slice(0, 10);
-        pushUndo();
-        if (cleaned) {
-          state.cells[key] = { kind: "text", value: cleaned };
-        } else {
-          delete state.cells[key];
+        const cellState = state.cells[key] || {};
+        const existing = cellState.text || "";
+        
+        if (cleaned !== existing) {
+          if (cleaned) {
+            state.cells[key] = { ...cellState, text: cleaned };
+          } else {
+            if (state.cells[key]) {
+              delete state.cells[key].text;
+              if (Object.keys(state.cells[key]).length === 0) delete state.cells[key];
+            }
+          }
         }
-        cell.classList.remove("cell-editing");
+        
+        const cell = document.querySelector(\`td[data-cell-key="\${key}"]\`);
+        if (cell) cell.classList.remove("cell-editing");
         renderTable();
         postUpdate();
       }
 
       function cancelInlineEdit() {
         if (!activeInlineInput) return;
-        const { cell } = activeInlineInput;
+        const { key } = activeInlineInput;
         activeInlineInput = null;
-        cell.classList.remove("cell-editing");
+        const cell = document.querySelector(\`td[data-cell-key="\${key}"]\`);
+        if (cell) cell.classList.remove("cell-editing");
         renderTable();
       }
 
@@ -1348,31 +1329,55 @@ function buildNotebookFrameDocument(match, self) {
           return;
         }
         const cell = event.target.closest("td[data-cell-key]");
-        if (!cell || state.tool === "pen") {
+        if (!cell || state.tool === "pen" || state.tool === "erase") {
           return;
         }
         const key = cell.dataset.cellKey;
         if (state.tool === "type") {
-          beginInlineEdit(cell, key);
+          beginInlineEdit(key);
           return;
         }
-        pushUndo();
-        if (state.tool === "erase" || state.tool === "clear") {
+        
+        const currentVal = state.cells[key] || {};
+        let modified = false;
+
+        if (state.tool === "clear") {
           delete state.cells[key];
+          modified = true;
+        } else if (state.tool === "clear-marks") {
+          if (currentVal.check || currentVal.cross) {
+            delete currentVal.check;
+            delete currentVal.cross;
+            if (currentVal.text) {
+              state.cells[key] = currentVal;
+            } else {
+              delete state.cells[key];
+            }
+            modified = true;
+          }
         } else if (state.tool === "check") {
-          state.cells[key] = { kind: "check" };
+          state.cells[key] = { ...currentVal, check: !currentVal.check };
+          modified = true;
         } else if (state.tool === "cross") {
-          state.cells[key] = { kind: "cross" };
+          state.cells[key] = { ...currentVal, cross: !currentVal.cross };
+          modified = true;
         }
-        renderTable();
-        postUpdate();
+        
+        // Clean up empty objects
+        if (state.cells[key] && !state.cells[key].check && !state.cells[key].cross && !state.cells[key].text) {
+          delete state.cells[key];
+        }
+
+        if (modified) {
+          renderTable();
+          postUpdate();
+        }
       });
 
       canvas.addEventListener("pointerdown", (event) => {
         if (state.tool !== "pen" && state.tool !== "erase") {
           return;
         }
-        pushUndo();
         activeStroke = {
           mode: state.tool,
           points: [pointerPoint(event)],
@@ -1406,20 +1411,14 @@ function buildNotebookFrameDocument(match, self) {
       });
 
       document.querySelector("[data-action='clear-ink']").addEventListener("click", () => {
-        pushUndo();
         state.strokes = [];
         redrawStrokes();
         postUpdate();
       });
 
-      document.querySelector("[data-action='undo']").addEventListener("click", () => {
-        performUndo();
-      });
-
       renderTable();
       setTool(state.tool);
       resizeCanvas();
-      updateUndoButton();
       window.addEventListener("resize", resizeCanvas);
     </script>
   </body>

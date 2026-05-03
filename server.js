@@ -145,9 +145,12 @@ io.on("connection", (socket) => {
       if (!roomState.tunnelTo) {
         return { ok: false, error: "No tunnel here." };
       }
+      if (room.match.hasMovedThisTurn || room.match.rollValue !== null) {
+        return { ok: false, error: "Can only use tunnel at the start of your turn." };
+      }
       player.position = { type: "room", roomId: roomState.tunnelTo };
       room.match.hasMovedThisTurn = true;
-      room.match.rollValue = room.match.rollValue ?? 0;
+      room.match.rollValue = 0;
       room.match.movementRemaining = 0;
       room.match.reachable = [];
       room.match.statusMessage = `${player.name} used a secret tunnel.`;
