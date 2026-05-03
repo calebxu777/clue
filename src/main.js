@@ -64,9 +64,11 @@ socket.on("connect_error", () => {
 render();
 
 function render() {
+  const showHero = !state.server;
   app.innerHTML = `
     <div class="game-shell">
       <div class="background-fog"></div>
+      ${showHero ? `
       <header class="hero-banner">
         <div class="hero-copy">
           <p class="eyebrow">Realtime Multiplayer Mystery</p>
@@ -80,6 +82,7 @@ function render() {
           <div class="hero-weapons"></div>
         </div>
       </header>
+      ` : ""}
 
       ${state.server ? renderSession() : renderEntry()}
     </div>
@@ -150,8 +153,6 @@ function renderLobby() {
             <p class="eyebrow">Lobby</p>
             <h2>Room ${state.server.roomCode}</h2>
             <p class="lead slim">${state.notice}</p>
-            <p class="debug-line">Debug: roomStatus=${state.server.roomStatus}, hasMatch=${Boolean(state.server.match)}, hostId=${state.server.hostId}, selfId=${state.server.self?.id ?? "none"}, localPlayerId=${state.playerId ?? "none"}</p>
-            ${state.clientError ? `<p class="debug-line debug-line--error">Client error: ${escapeAttr(state.clientError)}</p>` : ""}
           </div>
           <div class="room-pill">Share code: <strong>${state.server.roomCode}</strong></div>
         </div>
@@ -189,13 +190,14 @@ function renderMatch() {
 
   return `
     <main class="main-layout">
+      ${match.winnerId ? renderVictoryBanner(match) : ""}
       <div class="top-hud">
         <div class="turn-banner">
           <p class="eyebrow">Current Turn</p>
           <h2>${match.winnerId ? renderWinnerTitle() : `${currentPlayer.name} as ${getSuspect(currentPlayer.suspectId).name}`}</h2>
           <p class="status-text">${state.notice}</p>
           <div class="active-prompt">
-            <span class="prompt-chip">${pendingDisproof?.isForSelf ? "Choose one card to reveal." : pendingDisproof ? `Waiting on ${pendingDisproof.playerName} to choose a disproval card.` : isMyTurn ? "Your browser is the active seat." : `Waiting for ${currentPlayer.name}.`}</span>
+            <span class="prompt-chip">${match.winnerId ? state.notice : pendingDisproof?.isForSelf ? "Choose one card to reveal." : pendingDisproof ? `Waiting on ${pendingDisproof.playerName} to choose a disproval card.` : isMyTurn ? "Your browser is the active seat." : `Waiting for ${currentPlayer.name}.`}</span>
           </div>
         </div>
         <div class="dice-console">
@@ -242,12 +244,6 @@ function renderMatch() {
               `).join("")}
             </div>
           </section>
-          <section class="side-card">
-            <h3>Case File</h3>
-            <div class="log-panel">
-              ${match.log.slice().reverse().map((entry) => `<article class="log-entry">${entry}</article>`).join("")}
-            </div>
-          </section>
           ${renderNotebookPanel(match, self)}
         </aside>
       </div>
@@ -283,7 +279,7 @@ function renderMatch() {
 
           <div class="desk-note-row">
             <button data-action="toggle-hand" class="text-button">${state.revealHand ? "Hide Hand" : "Reveal Hand"}</button>
-            ${match.lastReveal ? `<span class="private-note">Private reveal: ${match.lastReveal.card.name}</span>` : ""}
+            ${match.lastReveal ? `<span class="private-note">Private reveal: ${match.lastReveal.disproverName} showed ${match.lastReveal.card.name}</span>` : ""}
           </div>
 
           ${state.revealHand ? renderHand(self?.hand ?? []) : `<div class="hand-hidden">Your private hand is hidden on this device.</div>`}
@@ -388,7 +384,7 @@ function renderDisproofChoices(options) {
 function renderNotebookPanel(match, self) {
   const revealCard = match.lastReveal?.card ?? null;
   const noteCopy = revealCard
-    ? `${match.lastReveal.card.name} was shown to you.`
+    ? `${match.lastReveal.disproverName ?? "Someone"} showed you ${match.lastReveal.card.name}.`
     : self?.note || "Mark suspects, weapons, and rooms as the case unfolds.";
 
   return `
@@ -708,7 +704,30 @@ function renderWinnerTitle() {
     return "No Detective Solved It";
   }
   const winner = state.server.match.players.find((player) => player.id === state.server.match.winnerId);
-  return winner ? `${winner.name} Solved the Case` : "Game Over";
+  return winner ? `${winner.name} Wins the Victory!` : "Game Over";
+}
+
+function renderVictoryBanner(match) {
+  if (!match.winnerId) return "";
+  const isNobody = match.winnerId === "nobody";
+  const winner = match.players.find((p) => p.id === match.winnerId);
+  const winnerName = winner?.name ?? "Unknown";
+  const suspectName = winner ? getSuspect(winner.suspectId).name : "";
+
+  return `
+    <div class="victory-overlay">
+      <div class="victory-card">
+        <div class="victory-glow"></div>
+        <p class="eyebrow victory-eyebrow">${isNobody ? "Case Unsolved" : "Case Closed"}</p>
+        <h2 class="victory-title">${isNobody ? "No Detective Solved It" : `${winnerName} Wins the Victory!`}</h2>
+        ${!isNobody && suspectName ? `<p class="victory-subtitle">Playing as ${suspectName}</p>` : ""}
+        <p class="victory-status">${state.notice}</p>
+        ${!isNobody ? `
+          <div class="victory-piece" style="${chessPieceStyle(getSuspect(winner.suspectId))}"></div>
+        ` : ""}
+      </div>
+    </div>
+  `;
 }
 
 function pipLayout(value) {
@@ -972,6 +991,29 @@ function buildNotebookFrameDocument(match, self) {
         background: rgba(43, 32, 21, 0.08);
       }
 
+      .cell-inline-input {
+        position: absolute;
+        inset: 2px;
+        width: calc(100% - 4px);
+        height: calc(100% - 4px);
+        border: 2px solid var(--accent);
+        border-radius: 8px;
+        background: #fffdf6;
+        color: var(--ink);
+        font: inherit;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-align: center;
+        padding: 0 4px;
+        outline: none;
+        z-index: 5;
+        box-shadow: 0 0 0 3px rgba(138, 47, 32, 0.15), 0 2px 8px rgba(0,0,0,0.12);
+      }
+
+      td.cell-editing {
+        background: rgba(138, 47, 32, 0.06);
+      }
+
       canvas {
         position: absolute;
         inset: 0;
@@ -1000,12 +1042,13 @@ function buildNotebookFrameDocument(match, self) {
           <button type="button" data-tool="type">Type</button>
           <button type="button" data-tool="check">Check</button>
           <button type="button" data-tool="cross">Cross</button>
+          <button type="button" data-tool="clear">Clear Cell</button>
         </div>
         <div class="tool-group">
           <button type="button" data-action="clear-ink">Clear Ink</button>
-          <button type="button" data-action="clear-marks">Clear Marks</button>
+          <button type="button" data-action="undo" id="undo-btn">Undo</button>
         </div>
-        <span class="toolbar-note">Private sheet for ${escapeHtml(self?.name ?? "Detective")}${match.lastReveal?.card ? ` • shown: ${escapeHtml(match.lastReveal.card.name)}` : ""}</span>
+        <span class="toolbar-note">Private sheet for ${escapeHtml(self?.name ?? "Detective")}${match.lastReveal?.card ? ` \u2022 ${escapeHtml(match.lastReveal.disproverName ?? "Someone")} showed: ${escapeHtml(match.lastReveal.card.name)}` : ""}</span>
       </div>
       <div class="sheet-wrap">
         <div class="sheet-stage" id="sheet-stage">
@@ -1026,7 +1069,39 @@ function buildNotebookFrameDocument(match, self) {
         cells: payload.notebookState?.cells || {},
         strokes: payload.notebookState?.strokes || [],
       };
+      const undoHistory = [];
+      const MAX_UNDO = 50;
       let activeStroke = null;
+
+      function pushUndo() {
+        undoHistory.push({
+          cells: JSON.parse(JSON.stringify(state.cells)),
+          strokes: JSON.parse(JSON.stringify(state.strokes)),
+        });
+        if (undoHistory.length > MAX_UNDO) {
+          undoHistory.shift();
+        }
+        updateUndoButton();
+      }
+
+      function performUndo() {
+        if (undoHistory.length === 0) return;
+        const snapshot = undoHistory.pop();
+        state.cells = snapshot.cells;
+        state.strokes = snapshot.strokes;
+        renderTable();
+        redrawStrokes();
+        postUpdate();
+        updateUndoButton();
+      }
+
+      function updateUndoButton() {
+        const btn = document.getElementById('undo-btn');
+        if (btn) {
+          btn.disabled = undoHistory.length === 0;
+          btn.textContent = undoHistory.length > 0 ? 'Undo (' + undoHistory.length + ')' : 'Undo';
+        }
+      }
 
       function escapeText(value) {
         return String(value ?? "")
@@ -1151,26 +1226,87 @@ function buildNotebookFrameDocument(match, self) {
         };
       }
 
+      let activeInlineInput = null;
+
+      function beginInlineEdit(cell, key) {
+        if (activeInlineInput) {
+          commitInlineEdit();
+        }
+        const existing = state.cells[key]?.kind === "text" ? state.cells[key].value : "";
+        cell.classList.add("cell-editing");
+        cell.innerHTML = "";
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "cell-inline-input";
+        input.value = existing;
+        input.maxLength = 10;
+        input.placeholder = "...";
+        cell.appendChild(input);
+        activeInlineInput = { input, cell, key };
+
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commitInlineEdit();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            cancelInlineEdit();
+          }
+        });
+        input.addEventListener("blur", () => {
+          setTimeout(() => {
+            if (activeInlineInput && activeInlineInput.input === input) {
+              commitInlineEdit();
+            }
+          }, 80);
+        });
+
+        requestAnimationFrame(() => {
+          input.focus();
+          input.select();
+        });
+      }
+
+      function commitInlineEdit() {
+        if (!activeInlineInput) return;
+        const { input, cell, key } = activeInlineInput;
+        activeInlineInput = null;
+        const cleaned = input.value.trim().slice(0, 10);
+        pushUndo();
+        if (cleaned) {
+          state.cells[key] = { kind: "text", value: cleaned };
+        } else {
+          delete state.cells[key];
+        }
+        cell.classList.remove("cell-editing");
+        renderTable();
+        postUpdate();
+      }
+
+      function cancelInlineEdit() {
+        if (!activeInlineInput) return;
+        const { cell } = activeInlineInput;
+        activeInlineInput = null;
+        cell.classList.remove("cell-editing");
+        renderTable();
+      }
+
       stage.addEventListener("click", (event) => {
+        if (event.target.closest(".cell-inline-input")) {
+          return;
+        }
         const cell = event.target.closest("td[data-cell-key]");
         if (!cell || state.tool === "pen") {
           return;
         }
         const key = cell.dataset.cellKey;
-        if (state.tool === "erase") {
+        if (state.tool === "type") {
+          beginInlineEdit(cell, key);
+          return;
+        }
+        pushUndo();
+        if (state.tool === "erase" || state.tool === "clear") {
           delete state.cells[key];
-        } else if (state.tool === "type") {
-          const existing = state.cells[key]?.kind === "text" ? state.cells[key].value : "";
-          const typed = window.prompt("Type a short note for this cell.", existing);
-          if (typed === null) {
-            return;
-          }
-          const cleaned = typed.trim().slice(0, 10);
-          if (cleaned) {
-            state.cells[key] = { kind: "text", value: cleaned };
-          } else {
-            delete state.cells[key];
-          }
         } else if (state.tool === "check") {
           state.cells[key] = { kind: "check" };
         } else if (state.tool === "cross") {
@@ -1184,6 +1320,7 @@ function buildNotebookFrameDocument(match, self) {
         if (state.tool !== "pen" && state.tool !== "erase") {
           return;
         }
+        pushUndo();
         activeStroke = {
           mode: state.tool,
           points: [pointerPoint(event)],
@@ -1217,20 +1354,20 @@ function buildNotebookFrameDocument(match, self) {
       });
 
       document.querySelector("[data-action='clear-ink']").addEventListener("click", () => {
+        pushUndo();
         state.strokes = [];
         redrawStrokes();
         postUpdate();
       });
 
-      document.querySelector("[data-action='clear-marks']").addEventListener("click", () => {
-        state.cells = {};
-        renderTable();
-        postUpdate();
+      document.querySelector("[data-action='undo']").addEventListener("click", () => {
+        performUndo();
       });
 
       renderTable();
       setTool(state.tool);
       resizeCanvas();
+      updateUndoButton();
       window.addEventListener("resize", resizeCanvas);
     </script>
   </body>

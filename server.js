@@ -206,6 +206,7 @@ io.on("connection", (socket) => {
     room.match.lastReveal = {
       suggesterId: room.pendingDisproof.suggesterId,
       disproverId: playerId,
+      disproverName: room.pendingDisproof.playerName,
       card: chosen,
     };
     const suggester = findPlayer(room, room.pendingDisproof.suggesterId);
@@ -236,9 +237,15 @@ io.on("connection", (socket) => {
         player.eliminated = true;
         room.match.statusMessage = `${player.name} made the wrong accusation and is out.`;
         logEvent(room, `${player.name} is eliminated but may still disprove suggestions.`);
-        if (!room.players.some((candidate) => !candidate.eliminated)) {
+        const remaining = room.players.filter((candidate) => !candidate.eliminated);
+        if (remaining.length === 0) {
           room.match.winnerId = "nobody";
+          room.match.statusMessage = "Every detective has been eliminated. Nobody wins.";
           logEvent(room, "Every detective has been eliminated.");
+        } else if (remaining.length === 1) {
+          room.match.winnerId = remaining[0].id;
+          room.match.statusMessage = `${remaining[0].name} wins — the last detective standing!`;
+          logEvent(room, `${remaining[0].name} wins the match as the last detective standing.`);
         } else {
           advanceTurn(room);
         }

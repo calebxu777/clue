@@ -1,0 +1,79 @@
+# Mobile-Friendly UI Refinement & Visual Polish
+
+The game logic is solid. This plan focuses on making the UI phone-friendly and visually premium.
+
+## Current Issues Identified
+
+1. **Board overflows on mobile** — the 25×25 grid doesn't fit in a 390px viewport
+2. **Action buttons are 5-column grid** — too cramped on phone screens  
+3. **Turn banner + Dice are side-by-side** — doesn't stack on narrow screens well enough
+4. **Detective notebook iframe** — table columns overflow when >2 players on mobile
+5. **Desk section stretches full width** — wastes space on desktop, awkward on mobile
+6. **No visual flair** — the game board area and cards could feel more immersive
+
+## Proposed Changes
+
+### 1. Mobile Board Container (scrollable + zoomable)
+- Wrap the board in a container with `overflow: auto` and a subtle "scroll to explore" hint
+- Set a `min-width` on the grid so it stays playable rather than shrinking tiles to nothing
+- Add a soft vignette/shadow on scroll edges so users know there's more
+
+### 2. Responsive Action Buttons  
+- On mobile: switch from 5-column to 2-column + 1 layout (2×2 grid + End Turn full-width)
+- Increase touch target to min 48px height
+- Add subtle active/pressed states for tactile feedback
+
+### 3. Stacking Top HUD
+- Already stacks via media query, but improve spacing and reduce font sizes on mobile
+- Make dice smaller on mobile (56px instead of 74px)
+
+### 4. Collapsible Sidebar Panels
+- On mobile, the Investigators panel and Detective Notes take too much vertical space
+- Add collapsible headers so users can expand/collapse sections
+- Default: Investigators collapsed, Notes expanded
+
+### 5. Card & Deck Visual Polish
+- Add a subtle shimmer/glow effect on hoverable cards in hand
+- Add a "card flip" micro-animation when a card is revealed
+- Slightly larger card art areas for better readability
+
+### 6. Board Visual Enhancements
+- Add a decorative border/frame around the board with a "wooden table" feel
+- Add subtle pawn drop shadows for depth
+- Animate the reachable tile glow with a pulse
+
+### 7. Landing Page Polish
+- Add a decorative magnifying glass or detective silhouette icon
+- Better input focus states with gold accent glow
+- Smoother card styling on the entry forms
+
+### 8. General Typography & Spacing
+- Import Google Font "Playfair Display" for headings (premium serif feel)
+- Use "Inter" for body text (clean, modern readability)
+- Tighten vertical rhythm on mobile to reduce scrolling
+
+---
+
+## Files Modified
+
+### [MODIFY] [styles.css](file:///c:/Users/Rita/Desktop/clue/src/styles.css)
+- Add Google Fonts import (Playfair Display + Inter)
+- Mobile breakpoints: board container scroll, button layout, dice sizing, collapsible panels
+- Visual polish: card glow, reachable tile pulse animation, board frame shadow
+- Better input focus states
+
+### [MODIFY] [main.js](file:///c:/Users/Rita/Desktop/clue/src/main.js)
+- Add collapsible panel toggle logic for Investigators/Notes on mobile
+- Add "scroll hint" overlay for board on small screens
+- Minor markup tweaks for new CSS hooks
+
+## Verification Plan
+
+### Browser Testing
+- Test at 390×844 (iPhone), 768×1024 (iPad), and 1440px (desktop)
+- Verify all interactive elements have ≥48px touch targets on mobile
+- Ensure board scrolls smoothly and doesn't break layout
+- Check that collapsible panels work and persist state
+
+> [!IMPORTANT]
+> These are purely CSS/UX changes — no game logic is modified. The server.js file is untouched.
