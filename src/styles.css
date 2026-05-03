@@ -25,12 +25,16 @@ body,
 
 body {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: 'Inter', Georgia, 'Times New Roman', serif;
   color: var(--ink);
   background:
     radial-gradient(circle at top left, rgba(196, 74, 52, 0.2), transparent 24%),
     radial-gradient(circle at right 20%, rgba(66, 116, 101, 0.18), transparent 22%),
     linear-gradient(180deg, #1a120d 0%, #21150f 45%, #120c08 100%);
+}
+
+h1, h2, h3 {
+  font-family: 'Playfair Display', Georgia, serif;
 }
 
 button,
@@ -95,6 +99,7 @@ select {
 
 .hero-copy h1 {
   margin: 0;
+  font-family: 'Playfair Display', Georgia, serif;
   font-size: clamp(3rem, 6vw, 5.6rem);
   line-height: 0.9;
 }
@@ -240,6 +245,14 @@ select {
   border-radius: 14px;
   border: 1px solid var(--line);
   background: rgba(247, 235, 214, 0.08);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.control input:focus,
+.control select:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(216, 178, 105, 0.2), 0 0 16px rgba(216, 178, 105, 0.1);
 }
 
 .player-form-list {
@@ -356,12 +369,10 @@ select {
 
 .top-hud {
   display: grid;
-  grid-template-columns: 1.08fr 0.92fr;
   gap: 18px;
 }
 
-.turn-banner,
-.dice-console {
+.turn-banner {
   background:
     linear-gradient(180deg, rgba(244, 232, 207, 0.06), rgba(255, 255, 255, 0.01)),
     var(--panel);
@@ -371,19 +382,34 @@ select {
   padding: 22px 24px;
 }
 
+.turn-banner--full {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.turn-banner-left {
+  min-width: 0;
+}
+
+.turn-banner-right {
+  min-width: 0;
+}
+
 .turn-banner h2 {
   margin: 0;
-  font-size: clamp(1.8rem, 2.2vw, 2.7rem);
+  font-size: clamp(1.6rem, 2.2vw, 2.7rem);
 }
 
 .status-text {
-  margin: 10px 0 0;
+  margin: 6px 0 0;
   color: var(--ink-soft);
   line-height: 1.5;
 }
 
 .active-prompt {
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .prompt-chip {
@@ -395,6 +421,19 @@ select {
   background: rgba(255, 255, 255, 0.05);
   font-size: 0.9rem;
   color: var(--ink-soft);
+}
+
+.turn-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.turn-meta strong {
+  color: var(--ink);
 }
 
 .dice-console {
@@ -473,8 +512,16 @@ select {
   gap: 18px;
 }
 
+.board-scroll-container {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 24px;
+  position: relative;
+}
+
 .board-frame {
   padding: 14px;
+  min-width: 500px;
   border-radius: 24px;
   background: linear-gradient(180deg, rgba(130, 88, 41, 0.56), rgba(77, 47, 19, 0.78));
   box-shadow: inset 0 0 0 1px rgba(255, 220, 163, 0.22), 0 16px 36px rgba(0, 0, 0, 0.32);
@@ -524,6 +571,12 @@ select {
     0 0 24px rgba(232, 58, 40, 0.72);
   cursor: pointer;
   z-index: 4;
+  animation: reachable-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes reachable-pulse {
+  0%, 100% { box-shadow: inset 0 0 0 4px rgba(255, 247, 235, 0.96), 0 0 0 4px rgba(232, 58, 40, 0.98), 0 0 24px rgba(232, 58, 40, 0.72); }
+  50% { box-shadow: inset 0 0 0 4px rgba(255, 247, 235, 0.96), 0 0 0 4px rgba(232, 58, 40, 0.98), 0 0 40px rgba(232, 58, 40, 0.9); }
 }
 
 .tile-label {
@@ -622,10 +675,17 @@ select {
   height: 18px;
   border-radius: 50%;
   background-size: 300% 200%;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+  transition: transform 200ms ease;
+}
+
+.pawn-piece:hover {
+  transform: scale(1.2);
 }
 
 .room-block--reachable {
   cursor: pointer;
+  z-index: 5;
   box-shadow:
     inset 0 0 0 5px rgba(229, 255, 245, 0.98),
     0 0 0 5px rgba(45, 215, 140, 0.98),
@@ -678,6 +738,40 @@ select {
 .side-panel {
   display: grid;
   gap: 18px;
+}
+
+.collapsible-card {
+  padding: 0;
+}
+
+.collapsible-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 22px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.collapsible-header h3 {
+  margin: 0;
+}
+
+.collapse-icon {
+  color: var(--gold);
+  font-size: 1.2rem;
+  transition: transform 200ms ease;
+}
+
+.collapsible-body {
+  padding: 0 22px 22px;
+}
+
+.collapsible-body.collapsed {
+  display: none;
 }
 
 .notebook-panel {
@@ -842,15 +936,48 @@ select {
 
 .desk-actions {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 8px;
   margin-top: 14px;
 }
 
 .desk-actions .action-button {
-  min-height: 44px;
+  min-height: 48px;
   padding: 10px 8px;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.desk-dice-result {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.die--desk {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+}
+
+.die--desk .pip-grid {
+  width: 28px;
+  height: 28px;
+  transform: scale(0.6) translate(-30%, -30%);
+}
+
+.dice-result-text strong {
+  display: block;
+  font-size: 1.1rem;
+}
+
+.dice-result-text small {
+  color: var(--ink-soft);
 }
 
 .desk-note-row {
@@ -896,13 +1023,28 @@ select {
 
 .case-card--choice {
   cursor: pointer;
+  position: relative;
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.case-card--choice::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 20%, rgba(255, 255, 255, 0.2) 50%, transparent 80%);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+  pointer-events: none;
 }
 
 .case-card--choice:hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
   border-color: rgba(255, 227, 172, 0.32);
+}
+
+.case-card--choice:hover::after {
+  transform: translateX(100%);
 }
 
 .case-card-art {
@@ -1097,9 +1239,23 @@ dialog::backdrop {
     grid-template-columns: 1fr;
   }
 
+  .turn-banner--full {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .desk-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .action-button--end {
+    grid-column: 1 / -1;
+  }
+
   .board-grid {
-    grid-template-columns: repeat(25, minmax(12px, 1fr));
-    grid-template-rows: repeat(25, minmax(12px, 1fr));
+    /* Keep a minimum reasonable size for the board tiles on mobile to avoid them shrinking too small */
+    grid-template-columns: repeat(25, minmax(20px, 1fr));
+    grid-template-rows: repeat(25, minmax(20px, 1fr));
   }
 
   .room-name {

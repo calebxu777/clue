@@ -92,13 +92,12 @@ io.on("connection", (socket) => {
         return { ok: false, error: "Already rolled." };
       }
       const dieA = randomInt(Math.random, 1, 6);
-      const dieB = randomInt(Math.random, 1, 6);
-      const total = dieA + dieB;
-      room.match.diceFaces = [dieA, dieB];
+      const total = dieA;
+      room.match.diceFaces = [dieA];
       room.match.rollValue = total;
       room.match.movementRemaining = total;
       room.match.reachable = getReachableDestinations(room.match, currentPlayer(room), total);
-      logEvent(room, `${currentPlayer(room).name} rolled ${total} (${dieA} + ${dieB}).`);
+      logEvent(room, `${currentPlayer(room).name} rolled ${total}.`);
       if (!room.match.reachable.length) {
         room.match.statusMessage = "No legal movement spaces from the current position.";
       } else {

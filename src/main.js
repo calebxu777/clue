@@ -22,6 +22,9 @@ const state = {
   accuseOpen: false,
   clientError: "",
   notebookState: readSavedNotebook(savedSession.roomCode, savedSession.playerId),
+  panelOpen: { investigators: true, notes: true },
+  showDice: false,
+  isRolling: false,
 };
 
 const app = document.querySelector("#app");
@@ -188,36 +191,38 @@ function renderMatch() {
   const currentRoom = self && selfPositionIsRoom() ? match.board.rooms[selfPosition().roomId] : null;
   const isMyTurn = match.currentPlayerId === self?.id;
 
+  const diceTotal = (match.diceFaces?.[0] ?? 0) + (match.diceFaces?.[1] ?? 0);
+  const hasRolled = match.rollValue !== null;
+
   return `
     <main class="main-layout">
       ${match.winnerId ? renderVictoryBanner(match) : ""}
       <div class="top-hud">
-        <div class="turn-banner">
-          <p class="eyebrow">Current Turn</p>
-          <h2>${match.winnerId ? renderWinnerTitle() : `${currentPlayer.name} as ${getSuspect(currentPlayer.suspectId).name}`}</h2>
-          <p class="status-text">${state.notice}</p>
-          <div class="active-prompt">
-            <span class="prompt-chip">${match.winnerId ? state.notice : pendingDisproof?.isForSelf ? "Choose one card to reveal." : pendingDisproof ? `Waiting on ${pendingDisproof.playerName} to choose a disproval card.` : isMyTurn ? "Your browser is the active seat." : `Waiting for ${currentPlayer.name}.`}</span>
+        <div class="turn-banner turn-banner--full">
+          <div class="turn-banner-left">
+            <p class="eyebrow">Current Turn</p>
+            <h2>${match.winnerId ? renderWinnerTitle() : `${currentPlayer.name} as ${getSuspect(currentPlayer.suspectId).name}`}</h2>
           </div>
-        </div>
-        <div class="dice-console">
-          <div class="dice-display">
-            <div class="die">${pipLayout(match.diceFaces?.[0] ?? 1)}</div>
-            <div class="die">${pipLayout(match.diceFaces?.[1] ?? 1)}</div>
-          </div>
-          <div class="dice-meta">
-            <span>Room <strong>${state.server.roomCode}</strong></span>
-            <span>Total <strong>${match.rollValue ?? "-"}</strong></span>
-            <span>Location <strong>${describePosition(self?.position, match.board)}</strong></span>
-            <span>Remaining <strong>${match.rollValue === null ? "-" : match.movementRemaining}</strong></span>
+          <div class="turn-banner-right">
+            <p class="status-text">${state.notice}</p>
+            <div class="active-prompt">
+              <span class="prompt-chip">${match.winnerId ? state.notice : pendingDisproof?.isForSelf ? "Choose one card to reveal." : pendingDisproof ? `Waiting on ${pendingDisproof.playerName} to choose a disproval card.` : isMyTurn ? "Your browser is the active seat." : `Waiting for ${currentPlayer.name}.`}</span>
+            </div>
+            <div class="turn-meta">
+              <span>Room <strong>${state.server.roomCode}</strong></span>
+              <span>Location <strong>${describePosition(self?.position, match.board)}</strong></span>
+              ${hasRolled ? `<span>Moves left <strong>${match.movementRemaining}</strong></span>` : ""}
+            </div>
           </div>
         </div>
       </div>
 
       <div class="play-layout">
         <section class="board-panel">
-          <div class="board-frame">
-            <div class="board-grid" id="board">${renderBoard()}</div>
+          <div class="board-scroll-container">
+            <div class="board-frame">
+              <div class="board-grid" id="board">${renderBoard()}</div>
+            </div>
           </div>
           <div class="board-legend">
             <span><i class="swatch swatch--hallway"></i>Hallway</span>
@@ -229,26 +234,31 @@ function renderMatch() {
         </section>
 
         <aside class="side-panel">
-          <section class="side-card">
-            <h3>Investigators</h3>
-            <div class="players-panel">
-            ${match.players.map((player) => `
-                <article class="investigator ${player.isCurrentTurn ? "investigator--active" : ""} ${player.eliminated ? "investigator--eliminated" : ""}">
-                  <div class="investigator-token" style="${chessPieceStyle(getSuspect(player.suspectId))}"></div>
-                  <div>
-                    <strong>${player.name}</strong>
-                    <small>${getSuspect(player.suspectId).name}</small>
-                    <small>${describePosition(player?.position, match.board)}</small>
-                  </div>
-                </article>
-              `).join("")}
+          <section class="side-card collapsible-card">
+            <button class="collapsible-header" data-toggle-panel="investigators">
+              <h3>Investigators</h3>
+              <span class="collapse-icon">${state.panelOpen.investigators ? "▾" : "▸"}</span>
+            </button>
+            <div class="collapsible-body ${state.panelOpen.investigators ? "" : "collapsed"}">
+              <div class="players-panel">
+              ${match.players.map((player) => `
+                  <article class="investigator ${player.isCurrentTurn ? "investigator--active" : ""} ${player.eliminated ? "investigator--eliminated" : ""}">
+                    <div class="investigator-token" style="${chessPieceStyle(getSuspect(player.suspectId))}"></div>
+                    <div>
+                      <strong>${player.name}</strong>
+                      <small>${getSuspect(player.suspectId).name}</small>
+                      <small>${describePosition(player?.position, match.board)}</small>
+                    </div>
+                  </article>
+                `).join("")}
+              </div>
             </div>
           </section>
           ${renderNotebookPanel(match, self)}
         </aside>
       </div>
 
-      <section class="side-card">
+      <section class="side-card desk-card">
         <div class="desk-header">
           <div>
             <p class="eyebrow">Your Desk</p>
@@ -270,12 +280,30 @@ function renderMatch() {
           </div>
 
           <div class="desk-actions">
-            <button data-action="roll" class="action-button action-button--primary" ${canRoll() ? "" : "disabled"}>Throw Dice</button>
-            <button data-action="suggest" class="action-button" ${canSuggest(currentRoom) ? "" : "disabled"}>Suggest</button>
-            <button data-action="accuse" class="action-button" ${canAct() ? "" : "disabled"}>Accuse</button>
-            <button data-action="tunnel" class="action-button" ${canTunnel(currentRoom) ? "" : "disabled"}>Tunnel</button>
-            <button data-action="end-turn" class="action-button" ${canEndTurn() ? "" : "disabled"}>End Turn</button>
+            <button data-action="roll" class="action-button action-button--primary" ${canRoll() ? "" : "disabled"}>🎲 Throw Dice</button>
+            <button data-action="suggest" class="action-button" ${canSuggest(currentRoom) ? "" : "disabled"}>💡 Suggest</button>
+            <button data-action="accuse" class="action-button" ${canAct() ? "" : "disabled"}>⚡ Accuse</button>
+            <button data-action="tunnel" class="action-button" ${canTunnel(currentRoom) ? "" : "disabled"}>🚪 Tunnel</button>
+            <button data-action="end-turn" class="action-button action-button--end" ${canEndTurn() ? "" : "disabled"}>End Turn</button>
           </div>
+
+          ${state.isRolling ? `
+            <div class="desk-dice-result">
+              <div class="die die--desk die--rolling">${pipLayout(5)}</div>
+              <div class="dice-result-text">
+                <strong>Rolling...</strong>
+              </div>
+            </div>
+          ` : state.showDice && hasRolled ? `
+            <div class="desk-dice-result">
+              <div class="die die--desk">${pipLayout(match.rollValue)}</div>
+              <div class="dice-result-text">
+                <strong>Rolled ${match.rollValue}</strong>
+                <small>${match.movementRemaining} moves remaining</small>
+                <span style="display: block; color: var(--gold); font-size: 0.85rem; margin-top: 4px; line-height: 1.3;">Please go to the map to decide where you are heading.</span>
+              </div>
+            </div>
+          ` : ""}
 
           <div class="desk-note-row">
             <button data-action="toggle-hand" class="text-button">${state.revealHand ? "Hide Hand" : "Reveal Hand"}</button>
@@ -577,7 +605,21 @@ function bindEvents() {
   });
 
   app.querySelectorAll("[data-action='roll']").forEach((button) => {
-    button.addEventListener("click", () => emitAck("action:roll", { roomCode: state.server.roomCode, playerId: state.playerId }));
+    button.addEventListener("click", async () => {
+      state.isRolling = true;
+      render();
+      const result = await emitAck("action:roll", { roomCode: state.server.roomCode, playerId: state.playerId });
+      setTimeout(() => {
+        state.isRolling = false;
+        if (result?.ok) {
+          state.showDice = true;
+          render();
+          setTimeout(() => { state.showDice = false; render(); }, 4000);
+        } else {
+          render();
+        }
+      }, 800);
+    });
   });
   app.querySelectorAll("[data-action='suggest']").forEach((button) => {
     button.addEventListener("click", () => {
@@ -595,10 +637,20 @@ function bindEvents() {
     button.addEventListener("click", () => emitAck("action:tunnel", { roomCode: state.server.roomCode, playerId: state.playerId }));
   });
   app.querySelectorAll("[data-action='end-turn']").forEach((button) => {
-    button.addEventListener("click", () => emitAck("action:endTurn", { roomCode: state.server.roomCode, playerId: state.playerId }));
+    button.addEventListener("click", () => {
+      state.showDice = false;
+      emitAck("action:endTurn", { roomCode: state.server.roomCode, playerId: state.playerId });
+    });
   });
   app.querySelectorAll("[data-action='disprove']").forEach((button) => {
     button.addEventListener("click", () => emitAck("action:disprove", { roomCode: state.server.roomCode, playerId: state.playerId, cardId: button.dataset.cardId }));
+  });
+  app.querySelectorAll("[data-toggle-panel]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const panelId = button.dataset.togglePanel;
+      state.panelOpen[panelId] = !state.panelOpen[panelId];
+      render();
+    });
   });
   app.querySelectorAll("[data-action='close-suggest']").forEach((button) => {
     button.addEventListener("click", () => {
