@@ -1,14 +1,57 @@
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Server } from "socket.io";
 import { buildDeck, createBoard, createSolution, getReachableDestinations, assignStartingPosition, nodeKey, randomInt } from "./shared/game-logic.js";
 import { ROOM_BLUEPRINTS, SUSPECTS, WEAPONS } from "./shared/game-data.js";
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 const rooms = new Map();
 
-const httpServer = http.createServer((_, res) => {
-  res.writeHead(200, { "Content-Type": "text/plain" });
-  res.end("Clue Mansion socket server is running.");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DIST_DIR = path.join(__dirname, "dist");
+const HAS_DIST = fs.existsSync(DIST_DIR);
+
+const MIME_TYPES = {
+  ".html": "text/html",
+  ".js": "application/javascript",
+  ".css": "text/css",
+  ".json": "application/json",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+};
+
+const httpServer = http.createServer((req, res) => {
+  if (!HAS_DIST) {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("Clue Mansion socket server is running (dev mode).");
+    return;
+  }
+
+  // Serve static files from dist/
+  let filePath = path.join(DIST_DIR, req.url === "/" ? "index.html" : req.url);
+  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+    filePath = path.join(DIST_DIR, "index.html");
+  }
+
+  const ext = path.extname(filePath);
+  const contentType = MIME_TYPES[ext] || "application/octet-stream";
+
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404);
+      res.end("Not found");
+      return;
+    }
+    res.writeHead(200, { "Content-Type": contentType });
+    res.end(data);
+  });
 });
 
 const io = new Server(httpServer, {

@@ -3,7 +3,8 @@ import "./styles.css";
 import { ROOM_BLUEPRINTS, SUSPECTS, WEAPONS } from "../shared/game-data.js";
 import { nodeKey } from "../shared/game-logic.js";
 
-const socket = io("http://localhost:3001", { autoConnect: true });
+const SOCKET_URL = window.location.hostname === "localhost" ? "http://localhost:3001" : undefined;
+const socket = io(SOCKET_URL, { autoConnect: true });
 const storageKey = "clue-mansion-session";
 const savedSession = readSavedSession();
 
