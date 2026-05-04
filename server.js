@@ -134,6 +134,9 @@ io.on("connection", (socket) => {
       if (room.match.rollValue !== null) {
         return { ok: false, error: "Already rolled." };
       }
+      if (room.match.hasSuggestedThisTurn) {
+        return { ok: false, error: "Cannot roll after suggesting." };
+      }
       const dieA = randomInt(Math.random, 1, 6);
       const total = dieA;
       room.match.diceFaces = [dieA];
@@ -218,11 +221,6 @@ io.on("connection", (socket) => {
       const roomId = player.position.roomId;
       const roomState = room.match.board.rooms[roomId];
       room.match.hasSuggestedThisTurn = true;
-      room.match.roomWeapons[roomId] = weaponId;
-      const namedPlayer = room.players.find((candidate) => candidate.suspectId === suspectId);
-      if (namedPlayer) {
-        namedPlayer.position = { type: "room", roomId };
-      }
       logEvent(room, `${player.name} suggests ${findName(SUSPECTS, suspectId)} with the ${findName(room.match.weapons, weaponId)} in the ${roomState.name}.`);
       room.pendingDisproof = prepareDisproval(room, player.id, suspectId, weaponId, roomId);
       if (room.pendingDisproof) {

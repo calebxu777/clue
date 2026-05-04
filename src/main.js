@@ -36,6 +36,11 @@ socket.on("state:update", (payload) => {
   const previousRoomCode = state.roomCode;
   const previousPlayerId = state.playerId;
   const previousMatchSeed = state.server?.match?.seed;
+  const wasMyTurn = state.server?.match?.currentPlayerId === state.playerId;
+  const hadDisproval = !!state.server?.pendingDisproof?.isForSelf;
+  const previousWinnerId = state.server?.match?.winnerId;
+  const previousRevealCard = state.server?.match?.lastReveal?.card?.id;
+  const previousPendingDisproof = !!state.server?.pendingDisproof;
   state.server = payload;
   state.roomCode = payload.roomCode;
   state.joinCode = payload.roomCode;
@@ -52,6 +57,34 @@ socket.on("state:update", (payload) => {
   persistSession();
   history.replaceState(null, "", payload.roomCode ? `?room=${payload.roomCode}` : window.location.pathname);
   render();
+
+  // Smart auto-scroll on state changes
+  if (payload.match) {
+    const isMyTurn = payload.match.currentPlayerId === state.playerId;
+    const hasDisproval = !!payload.pendingDisproof?.isForSelf;
+    const hasReveal = !!payload.match.lastReveal?.card;
+    const revealCardChanged = payload.match.lastReveal?.card?.id !== previousRevealCard;
+    const winnerChanged = payload.match.winnerId && payload.match.winnerId !== previousWinnerId;
+    const disprovalAppeared = !!payload.pendingDisproof && !previousPendingDisproof;
+
+    if (winnerChanged) {
+      // Someone won or was eliminated — scroll everyone to the top banner
+      scrollToSection("top-hud");
+    } else if (hasDisproval && !hadDisproval) {
+      // I need to choose a disproval card — use longer delay since panel renders after state update
+      scrollToSection("disproof-panel", 300);
+    } else if (disprovalAppeared && !hasDisproval) {
+      // Someone else needs to disprove — scroll to top to see status
+      scrollToSection("top-hud");
+    } else if (hasReveal && revealCardChanged) {
+      // A card was just revealed — scroll to detective notes
+      state.panelOpen.notes = true;
+      render();
+      scrollToSection("notebook-panel");
+    } else if (isMyTurn && !wasMyTurn && payload.match.rollValue === null) {
+      scrollToSection("desk-card");
+    }
+  }
 });
 
 socket.on("connect", async () => {
@@ -198,11 +231,11 @@ function renderMatch() {
   return `
     <main class="main-layout">
       ${match.winnerId ? renderVictoryBanner(match) : ""}
-      <div class="top-hud">
+      <div class="top-hud" id="top-hud">
         <div class="turn-banner turn-banner--full">
           <div class="turn-banner-left">
             <p class="eyebrow">Current Turn</p>
-            <h2>${match.winnerId ? renderWinnerTitle() : `${currentPlayer.name} as ${getSuspect(currentPlayer.suspectId).name}`}</h2>
+            <h2>${match.winnerId ? renderWinnerTitle() : currentPlayer.name}</h2>
           </div>
           <div class="turn-banner-right">
             <p class="status-text">${state.notice}</p>
@@ -235,35 +268,15 @@ function renderMatch() {
         </section>
 
         <aside class="side-panel">
-          <section class="side-card collapsible-card">
-            <button class="collapsible-header" data-toggle-panel="investigators">
-              <h3>Investigators</h3>
-              <span class="collapse-icon">${state.panelOpen.investigators ? "▾" : "▸"}</span>
-            </button>
-            <div class="collapsible-body ${state.panelOpen.investigators ? "" : "collapsed"}">
-              <div class="players-panel">
-              ${match.players.map((player) => `
-                  <article class="investigator ${player.isCurrentTurn ? "investigator--active" : ""} ${player.eliminated ? "investigator--eliminated" : ""}">
-                    <div class="investigator-token" style="${chessPieceStyle(getSuspect(player.suspectId))}"></div>
-                    <div>
-                      <strong>${player.name}</strong>
-                      <small>${getSuspect(player.suspectId).name}</small>
-                      <small>${describePosition(player?.position, match.board)}</small>
-                    </div>
-                  </article>
-                `).join("")}
-              </div>
-            </div>
-          </section>
           ${renderNotebookPanel(match, self)}
         </aside>
       </div>
 
-      <section class="side-card desk-card">
+      <section class="side-card desk-card" id="desk-card">
         <div class="desk-header">
           <div>
             <p class="eyebrow">Your Desk</p>
-            <h3>${self?.name ?? "Connecting..."} as ${self ? getSuspect(self.suspectId).name : "Unknown"}</h3>
+            <h3>${self?.name ?? "Connecting..."}</h3>
           </div>
           <div class="room-pill">${self?.eliminated ? "Eliminated" : isMyTurn ? "Your turn" : "Waiting"}</div>
         </div>
@@ -308,7 +321,7 @@ function renderMatch() {
 
           <div class="desk-note-row">
             <button data-action="toggle-hand" class="text-button">${state.revealHand ? "Hide Hand" : "Reveal Hand"}</button>
-            ${match.lastReveal ? `<span class="private-note">Private reveal: ${match.lastReveal.disproverName} showed ${match.lastReveal.card.name}</span>` : ""}
+            ${state.revealHand ? `<span class="private-note">These are your cards</span>` : ""}
           </div>
 
           ${state.revealHand ? renderHand(self?.hand ?? []) : `<div class="hand-hidden">Your private hand is hidden on this device.</div>`}
@@ -337,7 +350,6 @@ function renderBoard() {
           <span class="room-name">${room.name}</span>
           <span class="room-flavor">${room.flavor}</span>
           ${room.tunnelTo ? `<span class="room-badge room-badge--tunnel" style="${tunnelBadgeStyle()}">Tunnel to ${match.board.rooms[room.tunnelTo].name}</span>` : ""}
-          ${match.roomWeapons?.[room.id] ? `<span class="room-badge room-badge--weapon">${getWeapon(match.roomWeapons[room.id]).name}</span>` : ""}
         </div>
         <div class="room-pawns">${occupied.map((player) => pawnMarkup(getSuspect(player.suspectId), player.name)).join("")}</div>
       </button>
@@ -390,7 +402,7 @@ function renderHand(hand) {
 
 function renderDisproofChoices(options) {
   return `
-    <section class="disproof-panel">
+    <section class="disproof-panel" id="disproof-panel">
       <p class="eyebrow">Disprove Theory</p>
       <strong>Choose exactly one matching card to show.</strong>
       <div class="hand-grid hand-grid--choices">
@@ -417,29 +429,37 @@ function renderNotebookPanel(match, self) {
     : self?.note || "Mark suspects, weapons, and rooms as the case unfolds.";
 
   return `
-    <section class="side-card notebook-panel">
-      <div class="notebook-head">
+    <section class="side-card notebook-panel collapsible-card" id="notebook-panel">
+      <button class="collapsible-header" data-toggle-panel="notes">
         <div>
           <h3>Detective Notes</h3>
           <p class="lead slim">Private notebook for this browser seat.</p>
         </div>
-        <div class="room-pill">Notebook</div>
-      </div>
-      <div class="reveal-banner">
-        <strong>Latest clue</strong>
-        <span>${noteCopy}</span>
-      </div>
-      ${revealCard ? `
-        <div class="reveal-card">
-          ${renderHand([revealCard])}
+        <span class="collapse-icon">${state.panelOpen.notes ? "▾" : "▸"}</span>
+      </button>
+      <div class="collapsible-body ${state.panelOpen.notes ? "" : "collapsed"}">
+        <div class="reveal-banner ${revealCard ? "reveal-banner--active" : ""}">
+          <strong>🔍 Latest clue</strong>
+          <span>${noteCopy}</span>
         </div>
-      ` : ""}
-      <iframe
-        class="notebook-frame"
-        title="Detective score sheet"
-        sandbox="allow-scripts"
-        srcdoc="${escapeAttr(sanitizeNotebookDocument(buildNotebookFrameDocument(match, self)))}"
-      ></iframe>
+        ${revealCard ? `
+          <div class="reveal-card reveal-card--compact">
+            <div class="reveal-card-mini">
+              <div class="reveal-card-mini-art" style="${cardArtStyle(revealCard)}"></div>
+              <div class="reveal-card-mini-body">
+                <strong>${revealCard.name}</strong>
+                <small>${capitalize(revealCard.type)}</small>
+              </div>
+            </div>
+          </div>
+        ` : ""}
+        <iframe
+          class="notebook-frame"
+          title="Detective score sheet"
+          sandbox="allow-scripts"
+          srcdoc="${escapeAttr(sanitizeNotebookDocument(buildNotebookFrameDocument(match, self)))}"
+        ></iframe>
+      </div>
     </section>
   `;
 }
@@ -615,6 +635,7 @@ function bindEvents() {
         if (result?.ok) {
           state.showDice = true;
           render();
+          scrollToSection("board");
           setTimeout(() => { state.showDice = false; render(); }, 4000);
         } else {
           render();
@@ -626,21 +647,27 @@ function bindEvents() {
     button.addEventListener("click", () => {
       state.suggestOpen = true;
       render();
+      setTimeout(() => document.querySelector("dialog[open]")?.scrollIntoView({ behavior: "smooth", block: "center" }), 120);
     });
   });
   app.querySelectorAll("[data-action='accuse']").forEach((button) => {
     button.addEventListener("click", () => {
       state.accuseOpen = true;
       render();
+      setTimeout(() => document.querySelector("dialog[open]")?.scrollIntoView({ behavior: "smooth", block: "center" }), 120);
     });
   });
   app.querySelectorAll("[data-action='tunnel']").forEach((button) => {
-    button.addEventListener("click", () => emitAck("action:tunnel", { roomCode: state.server.roomCode, playerId: state.playerId }));
+    button.addEventListener("click", async () => {
+      await emitAck("action:tunnel", { roomCode: state.server.roomCode, playerId: state.playerId });
+      scrollToSection("board");
+    });
   });
   app.querySelectorAll("[data-action='end-turn']").forEach((button) => {
     button.addEventListener("click", () => {
       state.showDice = false;
       emitAck("action:endTurn", { roomCode: state.server.roomCode, playerId: state.playerId });
+      scrollToSection("board");
     });
   });
   app.querySelectorAll("[data-action='disprove']").forEach((button) => {
@@ -686,6 +713,12 @@ function bindEvents() {
   });
 }
 
+function scrollToSection(id, delay = 120) {
+  setTimeout(() => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, delay);
+}
+
 function emitAck(event, payload) {
   return new Promise((resolve) => {
     socket.timeout(4000).emit(event, payload, (error, response) => {
@@ -729,7 +762,7 @@ function canAct() {
 }
 
 function canRoll() {
-  return canAct() && state.server.match.rollValue === null;
+  return canAct() && state.server.match.rollValue === null && !state.server.match.hasSuggestedThisTurn;
 }
 
 function canSuggest(currentRoom) {
@@ -737,11 +770,11 @@ function canSuggest(currentRoom) {
 }
 
 function canTunnel(currentRoom) {
-  return canAct() && Boolean(currentRoom?.tunnelTo) && state.server.match.rollValue === null && !state.server.match.hasMovedThisTurn;
+  return canAct() && Boolean(currentRoom?.tunnelTo) && state.server.match.rollValue === null && !state.server.match.hasMovedThisTurn && !state.server.match.hasSuggestedThisTurn;
 }
 
 function canEndTurn() {
-  return canAct() && state.server.match.rollValue !== null;
+  return canAct() && (state.server.match.rollValue !== null || state.server.match.hasSuggestedThisTurn || state.server.match.hasMovedThisTurn);
 }
 
 function selfPosition() {
