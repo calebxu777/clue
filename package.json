@@ -11,12 +11,10 @@
     "start": "node server.js",
     "preview": "vite preview"
   },
-  "devDependencies": {
-    "vite": "^7.0.0"
-  },
   "dependencies": {
     "concurrently": "^9.2.1",
     "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "vite": "^7.0.0"
   }
 }
